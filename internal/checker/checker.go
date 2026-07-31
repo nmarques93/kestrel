@@ -19,6 +19,7 @@ type Target struct {
 	IntervalSeconds      int32
 	TimeoutMS            int32
 	ConsecutiveThreshold int32
+	CreatedAt            time.Time
 }
 
 // Result is the outcome of a single check.

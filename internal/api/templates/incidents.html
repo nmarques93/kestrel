@@ -1,0 +1,22 @@
+{{define "content"}}
+{{if not .Incidents}}
+  <p class="muted">No incidents recorded yet.</p>
+{{else}}
+<table>
+  <thead>
+    <tr><th>Target</th><th>Started</th><th>Resolved</th><th>Duration</th><th>Cause</th></tr>
+  </thead>
+  <tbody>
+    {{range .Incidents}}
+    <tr>
+      <td>{{.TargetName}}</td>
+      <td>{{.StartedAt.Format "2006-01-02 15:04:05 MST"}}</td>
+      <td>{{if .ResolvedAt}}{{.ResolvedAt.Format "2006-01-02 15:04:05 MST"}}{{else}}<span class="ongoing">ongoing</span>{{end}}</td>
+      <td>{{.Duration}}</td>
+      <td>{{if .Cause}}{{.Cause}}{{else}}<span class="muted">—</span>{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

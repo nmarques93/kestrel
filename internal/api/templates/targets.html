@@ -1,0 +1,22 @@
+{{define "content"}}
+{{if not .Targets}}
+  <p class="muted">No targets registered yet.</p>
+{{else}}
+<table>
+  <thead>
+    <tr><th>Name</th><th>URL</th><th>Status</th><th>Last checked</th><th>Uptime (24h)</th></tr>
+  </thead>
+  <tbody>
+    {{range .Targets}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{.URL}}</td>
+      <td>{{if .Up}}<span class="badge up">UP</span>{{else}}<span class="badge down">DOWN</span>{{end}}</td>
+      <td>{{if .LastCheckedAt}}{{.LastCheckedAt.Format "2006-01-02 15:04:05 MST"}}{{else}}<span class="muted">never</span>{{end}}</td>
+      <td>{{if .HasUptimeSample}}{{printf "%.1f" .UptimePercent}}%{{else}}<span class="muted">no data</span>{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

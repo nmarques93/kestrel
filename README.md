@@ -3,10 +3,10 @@
 A concurrent uptime monitor written in Go, with an MCP layer so an AI agent
 can query status and manage monitored targets directly.
 
-> **Status:** early stage. The scaffold, checker engine, and incident state
-> machine are in place; the HTTP API, webhooks, and MCP server are still
-> being built. This README will grow with the project — see below for what's
-> done.
+> **Status:** early stage. The scaffold, checker engine, incident state
+> machine, and HTTP API/status page are in place; webhooks and the MCP
+> server are still being built. This README will grow with the project —
+> see below for what's done.
 
 ## Why this project exists
 
@@ -35,9 +35,12 @@ Two things this project is built to demonstrate:
   after N consecutive failures, and recovers only after N consecutive
   successes), implemented as a pure function and covered by table-driven
   tests including the alternating pass/fail edge case
+- REST API for targets (CRUD), checks, incidents, and uptime %, plus a
+  minimal server-rendered status page (target list + incident timeline, no
+  JS) — both are thin wrappers over `internal/store`, so the same methods
+  will back the MCP tools later rather than duplicating the logic
 
 **Planned (see [PLAN.md](PLAN.md), kept local/untracked):**
-- REST API + minimal server-rendered status page
 - Webhook notifications on state transitions, with retry/backoff
 - MCP server exposing read (status, history, uptime %) and write
   (add/remove/update target) tools, API-key protected
@@ -49,6 +52,23 @@ Two things this project is built to demonstrate:
 - **Migrations:** [`goose`](https://github.com/pressly/goose), embedded in the binary
 - **MCP:** official Go MCP SDK (or `mark3labs/mcp-go` as a fallback)
 - **Deployment:** Docker + Fly.io
+
+## API
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/targets` | list targets with current status |
+| POST | `/api/targets` | create a target |
+| GET | `/api/targets/{id}` | get a target |
+| PUT | `/api/targets/{id}` | update a target |
+| DELETE | `/api/targets/{id}` | delete a target |
+| GET | `/api/targets/{id}/checks` | recent check history |
+| GET | `/api/targets/{id}/incidents` | a target's incidents |
+| GET | `/api/targets/{id}/uptime?window_hours=24` | uptime % over a window |
+| GET | `/api/incidents` | incident timeline across all targets |
+
+Plus `GET /` (target list) and `GET /incidents` (incident timeline) as
+server-rendered HTML.
 
 ## Local development
 

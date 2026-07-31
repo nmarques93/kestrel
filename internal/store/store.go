@@ -1,8 +1,8 @@
-// Package store provides the Postgres-backed implementations of the
-// checker package's TargetSource and ResultRecorder interfaces. It is the
-// only place that touches the checks/incidents tables, so the incident
-// state machine's rules get applied exactly once per result, inside a
-// single transaction.
+// Package store is the only thing that talks to Postgres. It implements
+// the checker package's TargetSource and ResultRecorder interfaces for the
+// checking engine, and provides the target/check/incident CRUD and read
+// methods the HTTP API (and, later, the MCP server) build on — the same
+// methods back both, so business logic lives in exactly one place.
 package store
 
 import (

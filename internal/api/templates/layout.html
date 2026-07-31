@@ -1,0 +1,30 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kestrel</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    nav a { margin-right: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #8884; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 0.3rem; font-size: 0.85em; font-weight: 600; }
+    .up { background: #1a7f371a; color: #1a7f37; }
+    .down { background: #cf222e1a; color: #cf222e; }
+    .muted { color: #8888; }
+    .ongoing { color: #cf222e; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Targets</a>
+    <a href="/incidents">Incidents</a>
+  </nav>
+  <h1>{{.Title}}</h1>
+  {{template "content" .}}
+</body>
+</html>
+{{end}}
