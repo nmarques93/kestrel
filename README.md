@@ -3,8 +3,8 @@
 A concurrent uptime monitor written in Go, with an MCP layer so an AI agent
 can query status and manage monitored targets directly.
 
-> **Status:** early stage. The scaffold (module, database, migrations) is in
-> place; the checker engine, HTTP API, webhooks, and MCP server are still
+> **Status:** early stage. The scaffold, checker engine, and incident state
+> machine are in place; the HTTP API, webhooks, and MCP server are still
 > being built. This README will grow with the project — see below for what's
 > done.
 
@@ -25,10 +25,18 @@ Two things this project is built to demonstrate:
 - Postgres schema for targets, checks, incidents, and MCP tokens
 - Embedded migrations (`cmd/migrate`), runnable identically in dev and in
   the deployed binary
+- Concurrent checker engine: a scheduler dispatches due targets into a
+  bounded worker pool over an unbuffered channel (so a spike of due targets
+  can't open unbounded concurrent checks), each check runs under its own
+  `context.WithTimeout` so one slow target can't hold up the others, and a
+  single writer goroutine drains results so nothing writes to Postgres
+  concurrently
+- Incident state machine with flap prevention (a target only trips DOWN
+  after N consecutive failures, and recovers only after N consecutive
+  successes), implemented as a pure function and covered by table-driven
+  tests including the alternating pass/fail edge case
 
 **Planned (see [PLAN.md](PLAN.md), kept local/untracked):**
-- Concurrent checker engine with a bounded worker pool and per-target timeout
-- Incident state machine with flap prevention (N consecutive failures/successes)
 - REST API + minimal server-rendered status page
 - Webhook notifications on state transitions, with retry/backoff
 - MCP server exposing read (status, history, uptime %) and write
@@ -52,7 +60,10 @@ make migrate-up    # apply migrations
 make run           # run the service
 ```
 
-Other targets: `make down`, `make migrate-down`, `make test`.
+Other targets: `make down`, `make migrate-down`, `make test`,
+`make test-integration` (spins up a real Postgres container via
+testcontainers-go to verify the store's SQL and incident-transition logic;
+requires Docker).
 
 By default the service expects Postgres reachable at
 `postgres://kestrel:kestrel@localhost:55432/kestrel` (see
