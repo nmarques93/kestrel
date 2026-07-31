@@ -4,8 +4,8 @@ A concurrent uptime monitor written in Go, with an MCP layer so an AI agent
 can query status and manage monitored targets directly.
 
 > **Status:** early stage. The scaffold, checker engine, incident state
-> machine, and HTTP API/status page are in place; webhooks and the MCP
-> server are still being built. This README will grow with the project —
+> machine, HTTP API/status page, and webhook notifications are in place; the
+> MCP server is still being built. This README will grow with the project —
 > see below for what's done.
 
 ## Why this project exists
@@ -39,9 +39,12 @@ Two things this project is built to demonstrate:
   minimal server-rendered status page (target list + incident timeline, no
   JS) — both are thin wrappers over `internal/store`, so the same methods
   will back the MCP tools later rather than duplicating the logic
+- Webhook notifications on DOWN and recovery, POSTed as JSON with retry and
+  exponential backoff on delivery failure; delivery runs in its own
+  goroutine so a slow or unreachable webhook endpoint never blocks the
+  checker engine's result writer
 
 **Planned (see [PLAN.md](PLAN.md), kept local/untracked):**
-- Webhook notifications on state transitions, with retry/backoff
 - MCP server exposing read (status, history, uptime %) and write
   (add/remove/update target) tools, API-key protected
 
@@ -90,6 +93,10 @@ By default the service expects Postgres reachable at
 [docker-compose.yml](docker-compose.yml) — port `55432` is used on the host
 to avoid clashing with a locally installed Postgres on `5432`). Override with
 the `DATABASE_URL` environment variable.
+
+Set `WEBHOOK_URL` to enable webhook notifications on DOWN/recovery; leave it
+unset to disable them entirely. `HTTP_ADDR` overrides the API/status page
+listen address (default `:8080`).
 
 ## Deployment
 

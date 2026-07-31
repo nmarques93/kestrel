@@ -10,6 +10,7 @@ import (
 
 	"github.com/nmarques93/kestrel/internal/checker"
 	"github.com/nmarques93/kestrel/internal/testutil"
+	"github.com/nmarques93/kestrel/internal/webhook"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -117,5 +118,78 @@ func TestStoreRecordOpensAndResolvesIncidentOnThreshold(t *testing.T) {
 	}
 	if resolvedCount != 1 {
 		t.Fatalf("resolved incidents = %d, want 1", resolvedCount)
+	}
+}
+
+// channelNotifier hands every event to a channel so a test can wait for the
+// background goroutine store.notify spawns instead of racing it.
+type channelNotifier struct {
+	events chan webhook.Event
+}
+
+func newChannelNotifier() *channelNotifier {
+	return &channelNotifier{events: make(chan webhook.Event, 10)}
+}
+
+func (n *channelNotifier) Notify(_ context.Context, event webhook.Event) error {
+	n.events <- event
+	return nil
+}
+
+func (n *channelNotifier) awaitEvent(t *testing.T) webhook.Event {
+	t.Helper()
+	select {
+	case e := <-n.events:
+		return e
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for webhook notification")
+		panic("unreachable")
+	}
+}
+
+func TestStoreFiresWebhookOnTransitions(t *testing.T) {
+	s := newTestStore(t)
+	notifier := newChannelNotifier()
+	s.SetNotifier(notifier)
+
+	id := insertTarget(t, s, 2)
+	ctx := context.Background()
+	now := time.Now()
+
+	record := func(success bool) {
+		t.Helper()
+		now = now.Add(time.Second)
+		errText := ""
+		if !success {
+			errText = "boom"
+		}
+		if err := s.Record(ctx, checker.Result{
+			TargetID: id, CheckedAt: now, Success: success, StatusCode: 200, LatencyMS: 5, Err: errText,
+		}); err != nil {
+			t.Fatalf("Record: %v", err)
+		}
+	}
+
+	record(false)
+	record(false) // trips DOWN (threshold 2)
+
+	downEvent := notifier.awaitEvent(t)
+	if downEvent.Type != "down" || downEvent.TargetID != id || downEvent.Cause == nil || *downEvent.Cause != "boom" {
+		t.Fatalf("down event = %+v, want type=down target_id=%d cause=boom", downEvent, id)
+	}
+	incidentID := downEvent.IncidentID
+
+	record(true)
+	record(true) // recovers
+
+	upEvent := notifier.awaitEvent(t)
+	if upEvent.Type != "up" || upEvent.TargetID != id || upEvent.IncidentID != incidentID || upEvent.ResolvedAt == nil {
+		t.Fatalf("up event = %+v, want type=up target_id=%d incident_id=%d with resolved_at set", upEvent, id, incidentID)
+	}
+
+	select {
+	case extra := <-notifier.events:
+		t.Fatalf("unexpected extra webhook event: %+v", extra)
+	default:
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/nmarques93/kestrel/internal/config"
 	"github.com/nmarques93/kestrel/internal/database"
 	"github.com/nmarques93/kestrel/internal/store"
+	"github.com/nmarques93/kestrel/internal/webhook"
 )
 
 func main() {
@@ -38,6 +39,10 @@ func main() {
 	defer stop()
 
 	s := store.New(pool)
+	if cfg.WebhookURL != "" {
+		s.SetNotifier(&webhook.Sender{URL: cfg.WebhookURL, Client: &http.Client{Timeout: 10 * time.Second}})
+		log.Printf("webhook notifications enabled: %s", cfg.WebhookURL)
+	}
 	engine := &checker.Engine{
 		Targets:  s,
 		Prober:   checker.NewHTTPProber(),

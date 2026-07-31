@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,16 +17,30 @@ import (
 
 	"github.com/nmarques93/kestrel/internal/checker"
 	"github.com/nmarques93/kestrel/internal/incident"
+	"github.com/nmarques93/kestrel/internal/webhook"
 )
+
+// notifyTimeout bounds how long a single webhook delivery (including
+// retries) is allowed to run. It's deliberately detached from the
+// triggering request's context, which may already be gone by the time the
+// goroutine below runs.
+const notifyTimeout = 30 * time.Second
 
 // Store implements checker.TargetSource and checker.ResultRecorder against
 // Postgres.
 type Store struct {
-	pool *pgxpool.Pool
+	pool     *pgxpool.Pool
+	notifier webhook.Notifier // nil disables webhook notifications
 }
 
 func New(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
+}
+
+// SetNotifier enables webhook notifications on incident transitions. Not
+// calling it leaves notifications disabled.
+func (s *Store) SetNotifier(n webhook.Notifier) {
+	s.notifier = n
 }
 
 var (
@@ -99,8 +114,10 @@ func (s *Store) Record(ctx context.Context, result checker.Result) error {
 	}
 
 	var threshold int32
-	if err := tx.QueryRow(ctx, `SELECT consecutive_threshold FROM targets WHERE id = $1`, result.TargetID).Scan(&threshold); err != nil {
-		return fmt.Errorf("load threshold: %w", err)
+	var targetName, targetURL string
+	if err := tx.QueryRow(ctx, `SELECT name, url, consecutive_threshold FROM targets WHERE id = $1`, result.TargetID).
+		Scan(&targetName, &targetURL, &threshold); err != nil {
+		return fmt.Errorf("load target: %w", err)
 	}
 
 	rows, err := tx.Query(ctx, `
@@ -136,12 +153,21 @@ func (s *Store) Record(ctx context.Context, result checker.Result) error {
 		return fmt.Errorf("load open incident: %w", err)
 	}
 
-	switch incident.Evaluate(currentState, recent, int(threshold)) {
+	transition := incident.Evaluate(currentState, recent, int(threshold))
+	var event *webhook.Event
+
+	switch transition {
 	case incident.ToDown:
-		if _, err := tx.Exec(ctx, `
+		var incidentID int64
+		if err := tx.QueryRow(ctx, `
 			INSERT INTO incidents (target_id, started_at, cause) VALUES ($1, $2, $3)
-		`, result.TargetID, result.CheckedAt, errText); err != nil {
+			RETURNING id
+		`, result.TargetID, result.CheckedAt, errText).Scan(&incidentID); err != nil {
 			return fmt.Errorf("open incident: %w", err)
+		}
+		event = &webhook.Event{
+			Type: "down", TargetID: result.TargetID, TargetName: targetName, TargetURL: targetURL,
+			IncidentID: incidentID, StartedAt: result.CheckedAt, Cause: errText,
 		}
 	case incident.ToUp:
 		if _, err := tx.Exec(ctx, `
@@ -149,10 +175,32 @@ func (s *Store) Record(ctx context.Context, result checker.Result) error {
 		`, result.CheckedAt, openIncidentID); err != nil {
 			return fmt.Errorf("resolve incident: %w", err)
 		}
+		resolvedAt := result.CheckedAt
+		event = &webhook.Event{
+			Type: "up", TargetID: result.TargetID, TargetName: targetName, TargetURL: targetURL,
+			IncidentID: openIncidentID, ResolvedAt: &resolvedAt,
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
+
+	if event != nil && s.notifier != nil {
+		s.notify(*event)
+	}
 	return nil
+}
+
+// notify delivers a webhook event in its own goroutine so a slow or failing
+// delivery never blocks the checker engine's single writer goroutine from
+// draining the next result.
+func (s *Store) notify(event webhook.Event) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
+		defer cancel()
+		if err := s.notifier.Notify(ctx, event); err != nil {
+			log.Printf("store: webhook notify target %d (%s): %v", event.TargetID, event.Type, err)
+		}
+	}()
 }
