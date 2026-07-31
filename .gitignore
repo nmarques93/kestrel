@@ -1,0 +1,5 @@
+/kestrel
+/bin/
+*.test
+*.out
+.env
