@@ -4,8 +4,8 @@ A concurrent uptime monitor written in Go, with an MCP layer so an AI agent
 can query status and manage monitored targets directly.
 
 > **Status:** early stage. The scaffold, checker engine, incident state
-> machine, HTTP API/status page, and webhook notifications are in place; the
-> MCP server is still being built. This README will grow with the project —
+> machine, HTTP API/status page, webhook notifications, and MCP server are
+> all in place; deployment is next. This README will grow with the project —
 > see below for what's done.
 
 ## Why this project exists
@@ -15,9 +15,9 @@ Two things this project is built to demonstrate:
 1. **Idiomatic concurrent Go.** The checker engine is a hand-rolled worker
    pool — goroutines, channels, `context` cancellation, backpressure — not a
    sequential loop that happens to be written in Go.
-2. **An MCP server with real read/write access.** An agent should be able to
-   ask "what's been flaky this week" or register a new target to watch, not
-   just consume a summary someone else generated.
+2. **An MCP server with real read/write access.** An agent can ask "what's
+   been flaky this week" or register a new target to watch, not just
+   consume a summary someone else generated — see [MCP](#mcp) below.
 
 ## Features
 
@@ -43,17 +43,20 @@ Two things this project is built to demonstrate:
   exponential backoff on delivery failure; delivery runs in its own
   goroutine so a slow or unreachable webhook endpoint never blocks the
   checker engine's result writer
+- MCP server (`/mcp`, streamable HTTP) exposing the same read/write
+  operations as the REST API — `list_targets`, `list_checks`,
+  `list_incidents`, `get_uptime`, `create_target`, `update_target`,
+  `delete_target` — as tools an agent can call, API-key protected
 
 **Planned (see [PLAN.md](PLAN.md), kept local/untracked):**
-- MCP server exposing read (status, history, uptime %) and write
-  (add/remove/update target) tools, API-key protected
+- Deployment (Dockerfile, fly.toml, a live instance)
 
 ## Stack
 
 - **Language:** Go, stdlib `net/http` — no web framework
 - **Database:** PostgreSQL via [`pgx`](https://github.com/jackc/pgx)
 - **Migrations:** [`goose`](https://github.com/pressly/goose), embedded in the binary
-- **MCP:** official Go MCP SDK (or `mark3labs/mcp-go` as a fallback)
+- **MCP:** [official Go MCP SDK](https://github.com/modelcontextprotocol/go-sdk)
 - **Deployment:** Docker + Fly.io
 
 ## API
@@ -72,6 +75,21 @@ Two things this project is built to demonstrate:
 
 Plus `GET /` (target list) and `GET /incidents` (incident timeline) as
 server-rendered HTML.
+
+## MCP
+
+`POST /mcp` speaks the MCP streamable HTTP transport and requires
+`Authorization: Bearer <token>`. Mint a token with:
+
+```bash
+go run ./cmd/mcptoken
+```
+
+The raw token is printed once and never stored — save it immediately.
+Tools available: `list_targets`, `list_checks`, `list_incidents`,
+`get_uptime`, `create_target`, `update_target`, `delete_target`. Every tool
+is a thin wrapper over the same `internal/store` methods the REST API uses,
+so an agent and a human operator always see identical state.
 
 ## Local development
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -15,6 +16,18 @@ import (
 // doesn't exist.
 var ErrNotFound = errors.New("not found")
 
+// Defaults mirror the targets table's column defaults (migrations/00001).
+// Exported so every caller that builds TargetParams from partial input —
+// the REST API and the MCP tools alike — defaults missing fields the same
+// way, rather than each guessing its own values.
+const (
+	DefaultExpectedStatusMin    int32 = 200
+	DefaultExpectedStatusMax    int32 = 300
+	DefaultIntervalSeconds      int32 = 60
+	DefaultTimeoutMS            int32 = 5000
+	DefaultConsecutiveThreshold int32 = 3
+)
+
 // TargetStatus is a target plus the read-only status the status page and
 // the targets list API report alongside it.
 type TargetStatus struct {
@@ -24,8 +37,8 @@ type TargetStatus struct {
 }
 
 // TargetParams holds the user-supplied fields for creating or updating a
-// target. Defaulting and validation happen in the caller (the HTTP
-// handler); Store persists exactly what it's given.
+// target. Callers should run ValidateTargetParams before persisting —
+// CreateTarget and UpdateTarget persist exactly what they're given.
 type TargetParams struct {
 	Name                 string
 	URL                  string
@@ -34,6 +47,32 @@ type TargetParams struct {
 	IntervalSeconds      int32
 	TimeoutMS            int32
 	ConsecutiveThreshold int32
+}
+
+// ValidateTargetParams checks that params are sane before they're persisted.
+// It's the single source of truth for what makes a target valid, called by
+// both the REST API and the MCP write tools.
+func ValidateTargetParams(p TargetParams) error {
+	if p.Name == "" {
+		return errors.New("name is required")
+	}
+	u, err := url.Parse(p.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return errors.New("url must be a valid http:// or https:// URL")
+	}
+	if p.ExpectedStatusMin < 100 || p.ExpectedStatusMax > 599 || p.ExpectedStatusMin >= p.ExpectedStatusMax {
+		return errors.New("expected_status_min must be less than expected_status_max, within 100-599")
+	}
+	if p.IntervalSeconds <= 0 {
+		return errors.New("interval_seconds must be positive")
+	}
+	if p.TimeoutMS <= 0 {
+		return errors.New("timeout_ms must be positive")
+	}
+	if p.ConsecutiveThreshold <= 0 {
+		return errors.New("consecutive_threshold must be positive")
+	}
+	return nil
 }
 
 // ListTargets returns every target along with whether it's currently up

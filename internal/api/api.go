@@ -11,6 +11,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/nmarques93/kestrel/internal/mcpserver"
 	"github.com/nmarques93/kestrel/internal/store"
 )
 
@@ -26,8 +29,9 @@ type Server struct {
 	// a single parsed set because every content file defines a block named
 	// "content" — combining them all would let the last one parsed win for
 	// every page.
-	pages map[string]*template.Template
-	mux   *http.ServeMux
+	pages     map[string]*template.Template
+	mux       *http.ServeMux
+	mcpServer *mcp.Server
 }
 
 func NewServer(s *store.Store) *Server {
@@ -37,6 +41,7 @@ func NewServer(s *store.Store) *Server {
 			"targets.html":   template.Must(template.ParseFS(templateFS, "templates/layout.html", "templates/targets.html")),
 			"incidents.html": template.Must(template.ParseFS(templateFS, "templates/layout.html", "templates/incidents.html")),
 		},
+		mcpServer: mcpserver.New(s),
 	}
 	srv.mux = srv.routes()
 	return srv
@@ -64,6 +69,9 @@ func (s *Server) routes() *http.ServeMux {
 
 	mux.HandleFunc("GET /{$}", s.handleTargetsPage)
 	mux.HandleFunc("GET /incidents", s.handleIncidentsPage)
+
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcpServer }, nil)
+	mux.Handle("/mcp", s.requireAPIKey(mcpHandler))
 
 	return mux
 }

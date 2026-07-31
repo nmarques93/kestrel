@@ -5,21 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/nmarques93/kestrel/internal/checker"
 	"github.com/nmarques93/kestrel/internal/store"
-)
-
-// Defaults mirror the targets table's column defaults (migrations/00001).
-const (
-	defaultExpectedStatusMin    int32 = 200
-	defaultExpectedStatusMax    int32 = 300
-	defaultIntervalSeconds      int32 = 60
-	defaultTimeoutMS            int32 = 5000
-	defaultConsecutiveThreshold int32 = 3
 )
 
 type targetResponse struct {
@@ -76,13 +66,13 @@ func (req targetRequest) toParams() (store.TargetParams, error) {
 	p := store.TargetParams{
 		Name:                 req.Name,
 		URL:                  req.URL,
-		ExpectedStatusMin:    valueOr(req.ExpectedStatusMin, defaultExpectedStatusMin),
-		ExpectedStatusMax:    valueOr(req.ExpectedStatusMax, defaultExpectedStatusMax),
-		IntervalSeconds:      valueOr(req.IntervalSeconds, defaultIntervalSeconds),
-		TimeoutMS:            valueOr(req.TimeoutMS, defaultTimeoutMS),
-		ConsecutiveThreshold: valueOr(req.ConsecutiveThreshold, defaultConsecutiveThreshold),
+		ExpectedStatusMin:    valueOr(req.ExpectedStatusMin, store.DefaultExpectedStatusMin),
+		ExpectedStatusMax:    valueOr(req.ExpectedStatusMax, store.DefaultExpectedStatusMax),
+		IntervalSeconds:      valueOr(req.IntervalSeconds, store.DefaultIntervalSeconds),
+		TimeoutMS:            valueOr(req.TimeoutMS, store.DefaultTimeoutMS),
+		ConsecutiveThreshold: valueOr(req.ConsecutiveThreshold, store.DefaultConsecutiveThreshold),
 	}
-	return p, validateTargetParams(p)
+	return p, store.ValidateTargetParams(p)
 }
 
 func valueOr(p *int32, fallback int32) int32 {
@@ -90,29 +80,6 @@ func valueOr(p *int32, fallback int32) int32 {
 		return fallback
 	}
 	return *p
-}
-
-func validateTargetParams(p store.TargetParams) error {
-	if p.Name == "" {
-		return errors.New("name is required")
-	}
-	u, err := url.Parse(p.URL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return errors.New("url must be a valid http:// or https:// URL")
-	}
-	if p.ExpectedStatusMin < 100 || p.ExpectedStatusMax > 599 || p.ExpectedStatusMin >= p.ExpectedStatusMax {
-		return errors.New("expected_status_min must be less than expected_status_max, within 100-599")
-	}
-	if p.IntervalSeconds <= 0 {
-		return errors.New("interval_seconds must be positive")
-	}
-	if p.TimeoutMS <= 0 {
-		return errors.New("timeout_ms must be positive")
-	}
-	if p.ConsecutiveThreshold <= 0 {
-		return errors.New("consecutive_threshold must be positive")
-	}
-	return nil
 }
 
 func (s *Server) handleListTargets(w http.ResponseWriter, r *http.Request) {

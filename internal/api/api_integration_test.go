@@ -43,7 +43,7 @@ func TestTargetsCRUD(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	if created.Name != "example" || created.IntervalSeconds != 30 || created.TimeoutMS != defaultTimeoutMS {
+	if created.Name != "example" || created.IntervalSeconds != 30 || created.TimeoutMS != store.DefaultTimeoutMS {
 		t.Fatalf("created target = %+v, defaults not applied as expected", created)
 	}
 

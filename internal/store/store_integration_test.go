@@ -147,6 +147,51 @@ func (n *channelNotifier) awaitEvent(t *testing.T) webhook.Event {
 	}
 }
 
+func TestMCPTokenCreateAndAuthenticate(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	token, err := s.CreateMCPToken(ctx)
+	if err != nil {
+		t.Fatalf("CreateMCPToken: %v", err)
+	}
+	if token == "" {
+		t.Fatal("CreateMCPToken returned an empty token")
+	}
+
+	valid, err := s.AuthenticateMCPToken(ctx, token)
+	if err != nil {
+		t.Fatalf("AuthenticateMCPToken: %v", err)
+	}
+	if !valid {
+		t.Fatal("AuthenticateMCPToken(valid token) = false, want true")
+	}
+
+	var lastUsedAt *time.Time
+	if err := s.pool.QueryRow(ctx, `SELECT last_used_at FROM mcp_tokens WHERE token_hash = $1`, hashToken(token)).Scan(&lastUsedAt); err != nil {
+		t.Fatalf("query last_used_at: %v", err)
+	}
+	if lastUsedAt == nil {
+		t.Fatal("last_used_at was not set after a successful authentication")
+	}
+
+	invalid, err := s.AuthenticateMCPToken(ctx, "kestrel_not-a-real-token")
+	if err != nil {
+		t.Fatalf("AuthenticateMCPToken(bogus): %v", err)
+	}
+	if invalid {
+		t.Fatal("AuthenticateMCPToken(bogus token) = true, want false")
+	}
+
+	empty, err := s.AuthenticateMCPToken(ctx, "")
+	if err != nil {
+		t.Fatalf("AuthenticateMCPToken(empty): %v", err)
+	}
+	if empty {
+		t.Fatal("AuthenticateMCPToken(empty token) = true, want false")
+	}
+}
+
 func TestStoreFiresWebhookOnTransitions(t *testing.T) {
 	s := newTestStore(t)
 	notifier := newChannelNotifier()
