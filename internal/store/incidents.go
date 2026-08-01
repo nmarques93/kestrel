@@ -16,6 +16,17 @@ type Incident struct {
 	Cause      *string
 }
 
+// DurationSeconds reports how long a resolved incident lasted, or nil if
+// it's still ongoing. Both the REST API and the MCP tools call this rather
+// than each computing the subtraction themselves.
+func (i Incident) DurationSeconds() *float64 {
+	if i.ResolvedAt == nil {
+		return nil
+	}
+	d := i.ResolvedAt.Sub(i.StartedAt).Seconds()
+	return &d
+}
+
 // ListIncidents returns incidents newest-first, optionally filtered to a
 // single target. Pass targetID nil for the incident timeline across every
 // target.

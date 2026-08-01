@@ -147,8 +147,8 @@ func TestMCPChecksIncidentsAndUptime(t *testing.T) {
 	}
 
 	incidents := callTool[listIncidentsOutput](t, session, "list_incidents", map[string]any{"target_id": created.ID})
-	if len(incidents.Incidents) != 1 || !incidents.Incidents[0].Ongoing {
-		t.Fatalf("list_incidents = %+v, want exactly one ongoing incident", incidents)
+	if len(incidents.Incidents) != 1 || !incidents.Incidents[0].Ongoing || incidents.Incidents[0].DurationSeconds != nil {
+		t.Fatalf("list_incidents = %+v, want exactly one ongoing incident with no duration yet", incidents)
 	}
 
 	global := callTool[listIncidentsOutput](t, session, "list_incidents", nil)
@@ -159,5 +159,13 @@ func TestMCPChecksIncidentsAndUptime(t *testing.T) {
 	uptime := callTool[getUptimeOutput](t, session, "get_uptime", map[string]any{"target_id": created.ID, "window_hours": 1})
 	if !uptime.HasData || uptime.SampleSize != 3 {
 		t.Fatalf("get_uptime = %+v, want has_data=true sample_size=3", uptime)
+	}
+
+	record(true)
+	record(true) // recovers (threshold 2)
+
+	resolved := callTool[listIncidentsOutput](t, session, "list_incidents", map[string]any{"target_id": created.ID})
+	if len(resolved.Incidents) != 1 || resolved.Incidents[0].Ongoing || resolved.Incidents[0].DurationSeconds == nil {
+		t.Fatalf("list_incidents after recovery = %+v, want one resolved incident with a duration", resolved)
 	}
 }

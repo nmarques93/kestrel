@@ -61,7 +61,7 @@ func listIncidentsHandler(s *store.Store) mcp.ToolHandlerFor[listIncidentsInput,
 			out.Incidents[i] = incidentOut{
 				ID: inc.ID, TargetID: inc.TargetID, TargetName: inc.TargetName,
 				StartedAt: inc.StartedAt, ResolvedAt: inc.ResolvedAt, Cause: inc.Cause,
-				Ongoing: inc.ResolvedAt == nil,
+				Ongoing: inc.ResolvedAt == nil, DurationSeconds: inc.DurationSeconds(),
 			}
 		}
 		return nil, out, nil

@@ -41,13 +41,14 @@ type listChecksOutput struct {
 }
 
 type incidentOut struct {
-	ID         int64      `json:"id"`
-	TargetID   int64      `json:"target_id"`
-	TargetName string     `json:"target_name"`
-	StartedAt  time.Time  `json:"started_at"`
-	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
-	Ongoing    bool       `json:"ongoing"`
-	Cause      *string    `json:"cause,omitempty"`
+	ID              int64      `json:"id"`
+	TargetID        int64      `json:"target_id"`
+	TargetName      string     `json:"target_name"`
+	StartedAt       time.Time  `json:"started_at"`
+	ResolvedAt      *time.Time `json:"resolved_at,omitempty"`
+	Ongoing         bool       `json:"ongoing"`
+	Cause           *string    `json:"cause,omitempty"`
+	DurationSeconds *float64   `json:"duration_seconds,omitempty" jsonschema:"how long the incident lasted, in seconds; only set once resolved"`
 }
 
 type listIncidentsInput struct {

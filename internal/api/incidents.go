@@ -31,15 +31,11 @@ func (s *Server) handleListIncidents(w http.ResponseWriter, r *http.Request) {
 func incidentsToResponse(incidents []store.Incident) []incidentResponse {
 	resp := make([]incidentResponse, len(incidents))
 	for i, inc := range incidents {
-		r := incidentResponse{
+		resp[i] = incidentResponse{
 			ID: inc.ID, TargetID: inc.TargetID, TargetName: inc.TargetName,
 			StartedAt: inc.StartedAt, ResolvedAt: inc.ResolvedAt, Cause: inc.Cause,
+			DurationSeconds: inc.DurationSeconds(),
 		}
-		if inc.ResolvedAt != nil {
-			d := inc.ResolvedAt.Sub(inc.StartedAt).Seconds()
-			r.DurationSeconds = &d
-		}
-		resp[i] = r
 	}
 	return resp
 }
