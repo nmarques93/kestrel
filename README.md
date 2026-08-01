@@ -19,6 +19,10 @@ Two things this project is built to demonstrate:
    been flaky this week" or register a new target to watch, not just
    consume a summary someone else generated — see [MCP](#mcp) below.
 
+The reasoning behind the two hardest parts — the checker engine's
+concurrency design and the incident state machine's flap prevention — is
+written up in [DECISIONS.md](DECISIONS.md).
+
 ## Features
 
 **Done:**
@@ -47,7 +51,6 @@ Two things this project is built to demonstrate:
   operations as the REST API — `list_targets`, `list_checks`,
   `list_incidents`, `get_uptime`, `create_target`, `update_target`,
   `delete_target` — as tools an agent can call, API-key protected
-
 - Dockerfile (multi-stage, ~15MB Alpine runtime image) and fly.toml,
   verified locally — builds, migrates, serves, and shuts down cleanly on
   SIGTERM inside the container
@@ -97,7 +100,8 @@ so an agent and a human operator always see identical state.
 
 ## Local development
 
-Requires Go 1.23+ and Docker.
+Requires Go 1.25+ (or an older Go with `GOTOOLCHAIN=auto`, which will
+fetch the pinned version) and Docker.
 
 ```bash
 make up           # start Postgres in Docker
