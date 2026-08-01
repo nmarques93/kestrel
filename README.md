@@ -48,8 +48,12 @@ Two things this project is built to demonstrate:
   `list_incidents`, `get_uptime`, `create_target`, `update_target`,
   `delete_target` — as tools an agent can call, API-key protected
 
+- Dockerfile (multi-stage, ~15MB Alpine runtime image) and fly.toml,
+  verified locally — builds, migrates, serves, and shuts down cleanly on
+  SIGTERM inside the container
+
 **Planned (see [PLAN.md](PLAN.md), kept local/untracked):**
-- Deployment (Dockerfile, fly.toml, a live instance)
+- A live deployed instance (infrastructure not yet provisioned)
 
 ## Stack
 
@@ -118,4 +122,28 @@ listen address (default `:8080`).
 
 ## Deployment
 
-Not yet set up — tracked as a milestone in progress.
+Docker + [Fly.io](https://fly.io). The Dockerfile is a multi-stage build
+producing a small Alpine image containing all three binaries
+(`kestrel`, `migrate`, `mcptoken`); `fly.toml` runs `migrate -direction up`
+as the `release_command` before every deploy, so the schema is always
+current before new code starts serving traffic.
+
+Build and run locally:
+
+```bash
+docker build -t kestrel .
+docker run --rm -e DATABASE_URL=... -p 8080:8080 kestrel
+```
+
+To deploy (not yet done — infrastructure isn't provisioned):
+
+```bash
+fly launch --no-deploy         # first time only, creates the app
+fly postgres create            # or attach an existing cluster
+fly secrets set DATABASE_URL=... WEBHOOK_URL=...
+fly deploy
+```
+
+`DATABASE_URL` and `WEBHOOK_URL` are set via `fly secrets`, never committed —
+`fly.toml` only holds non-sensitive config (`HTTP_ADDR`, the release
+command, VM size).
